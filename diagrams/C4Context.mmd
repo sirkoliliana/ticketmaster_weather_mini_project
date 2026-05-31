@@ -1,0 +1,12 @@
+C4Context
+    title System Context Diagram
+        
+    Person(user, "User", "Views the interactive page to plan event attendance based on weather.")
+    System(system, "Event-Weather System", "Aggregates upcoming events and local weather forecasts to display on the page.")
+        
+    System_Ext(ticketmaster, "Ticketmaster API", "Open Data Source: Provides event locations, dates, and times.")
+    System_Ext(openweather, "OpenMeteo API", "Open Data Source: Provides weather forecasts for specific coordinates.")
+    
+    Rel(user, system, "Interacts with UI")
+    Rel(system, ticketmaster, "Fetches events")
+    Rel(system, openweather, "Fetches weather")
