@@ -1,0 +1,14 @@
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Environment variables
+.env
+
+# Docker database volumes
+postgres_dev_data/
+postgres_prod_data/
+
+# OS generated files
+.DS_Store

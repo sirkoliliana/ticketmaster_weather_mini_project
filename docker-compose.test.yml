@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  test_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: event_weather_test
+
+  test_backend:
+    build:
+      context: ./backend
+      target: test
+    environment:
+      - DATABASE_URL=postgresql://user:password@test_db:5432/event_weather_test
+    depends_on:
+      - test_db

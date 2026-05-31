@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: prod_user
+      POSTGRES_PASSWORD: secure_prod_password
+      POSTGRES_DB: event_weather_prod
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    restart: always
+
+  backend:
+    build:
+      context: ./backend
+      target: prod
+    ports:
+      - "80:8000"
+    environment:
+      - DATABASE_URL=postgresql://prod_user:secure_prod_password@db:5432/event_weather_prod
+    depends_on:
+      - db
+    restart: always
+
+volumes:
+  postgres_prod_data:
