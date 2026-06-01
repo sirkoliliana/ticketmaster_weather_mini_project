@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"> <title>Event Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        #map { height: 100vh; width: 100vw; }
+        .control-panel {
+            position: absolute;
+            top: 20px;
+            left: 50px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .controls-row { display: flex; align-items: center; gap: 8px; }
+        input, button { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+        button { background: #007aff; color: white; border: none; cursor: pointer; padding: 8px 16px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #loading { display: none; font-size: 14px; color: #666; font-weight: 500; }
+
+        /* Popup styles */
+        .event-popup {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-width: 240px;
+            max-width: 300px;
+        }
+        .event-popup-title {
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 10px;
+            line-height: 1.3;
+            color: #111;
+        }
+        .event-dates-scroll {
+            max-height: 200px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-right: 4px;
+        }
+        /* Scrollbar styling */
+        .event-dates-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .event-dates-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .event-dates-scroll::-webkit-scrollbar-thumb {
+            background: #bbb;
+            border-radius: 4px;
+        }
+        .event-dates-scroll::-webkit-scrollbar-thumb:hover {
+            background: #888;
+        }
+        .event-date-entry {
+            background: #f7f8fa;
+            border-radius: 8px;
+            padding: 8px 10px;
+            border-left: 3px solid #007aff;
+            font-size: 13px;
+            color: #333;
+            line-height: 1.6;
+        }
+        .event-date-entry a {
+            display: inline-block;
+            margin-top: 4px;
+            color: #007aff;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .event-date-entry a:hover {
+            text-decoration: underline;
+        }
+        .event-date-entry .date-label {
+            font-weight: 600;
+            color: #007aff;
+        }
+        .date-divider {
+            border: none;
+            border-top: 1px solid #e5e7eb;
+            margin: 0;
+        }
+        .scroll-hint {
+            font-size: 11px;
+            color: #999;
+            text-align: center;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="control-panel">
+        <div class="controls-row">
+            <input type="text" id="cityInput" placeholder="Enter City (e.g., Warsaw)" />
+            <input type="number" id="radiusInput" value="30" style="width: 60px;" /> km
+        </div>
+        <div class="controls-row">
+            <label style="font-size: 14px;">From:</label>
+            <input type="date" id="startDateInput" />
+            <label style="font-size: 14px;">To:</label>
+            <input type="date" id="endDateInput" />
+            <button id="searchBtn" onclick="searchArea()">Search</button>
+        </div>
+        <div id="loading">Fetching events and weather...</div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([52.2297, 21.0122], 6);
+        let markers = [];
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        // Date Constraints Logic
+        const today = new Date();
+        const tomorrow = new Date();
+        tomorrow.setDate(today.getDate() + 1);
+        const maxDate = new Date();
+        maxDate.setDate(tomorrow.getDate() + 13);
+
+        const formatDate = (date) => date.toISOString().split('T')[0];
+        const startInput = document.getElementById('startDateInput');
+        const endInput = document.getElementById('endDateInput');
+
+        startInput.min = formatDate(tomorrow);
+        startInput.max = formatDate(maxDate);
+        endInput.min = formatDate(tomorrow);
+        endInput.max = formatDate(maxDate);
+
+        startInput.value = formatDate(tomorrow);
+        endInput.value = formatDate(tomorrow);
+
+        startInput.addEventListener('change', () => {
+            if (startInput.value > endInput.value) {
+                endInput.value = startInput.value;
+            }
+            endInput.min = startInput.value;
+        });
+
+        async function searchArea() {
+            const city = document.getElementById('cityInput').value;
+            const radius = document.getElementById('radiusInput').value;
+            const startDate = startInput.value;
+            const endDate = endInput.value;
+            const btn = document.getElementById('searchBtn');
+            const loading = document.getElementById('loading');
+
+            if (!city) return;
+
+            btn.disabled = true;
+            loading.style.display = 'block';
+
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+
+            try {
+                const response = await fetch(`http://localhost:8000/api/search?city=${city}&radius=${radius}&start_date=${startDate}&end_date=${endDate}`);
+                const payload = await response.json();
+
+                map.setView([payload.center.lat, payload.center.lon], 10);
+
+                // Group events by a key: event_name + lat + lon
+                // This handles the same event spanning multiple days at the same venue
+                const grouped = {};
+                payload.data.forEach(event => {
+                    const key = `${event.event_name}__${event.latitude}__${event.longitude}`;
+                    if (!grouped[key]) {
+                        grouped[key] = {
+                            event_name: event.event_name,
+                            latitude: event.latitude,
+                            longitude: event.longitude,
+                            ticket_url: event.ticket_url,
+                            dates: []
+                        };
+                    }
+                    grouped[key].dates.push(event);
+                });
+
+                // Create one marker per unique event+location
+                Object.values(grouped).forEach(group => {
+                    const { event_name, latitude, longitude, dates } = group;
+
+                    // Build date entries HTML
+                    const dateEntriesHtml = dates.map((event, i) => {
+                        const currency = event.currency || '';
+                        let priceStr = 'N/A';
+                        if (event.price_min && event.price_max && event.price_min !== event.price_max) {
+                            priceStr = `${event.price_min} – ${event.price_max} ${currency}`;
+                        } else if (event.price_min) {
+                            priceStr = `${event.price_min} ${currency}`;
+                        }
+
+                        const weatherStr = (event.weather_temp_max !== undefined && event.weather_condition)
+                            ? `${event.weather_temp_max}°C, ${event.weather_condition}`
+                            : 'N/A';
+
+                        const ticketLink = event.ticket_url
+                            ? `<a href="${event.ticket_url}" target="_blank">Tickets</a>`
+                            : '';
+
+                        return `
+                            <div class="event-date-entry">
+                                <span class="date-label"> ${event.target_date}</span> at ${event.time || 'TBD'}<br>
+                                Price: ${priceStr}<br>
+                                Weather: ${weatherStr}
+                                ${ticketLink}
+                            </div>
+                        `;
+                    }).join('');
+
+                    const scrollHint = dates.length > 3
+                        ? `<div class="scroll-hint">scroll for all ${dates.length} dates</div>`
+                        : '';
+
+                    const popupContent = `
+                        <div class="event-popup">
+                            <div class="event-popup-title">${event_name}</div>
+                            <div class="event-dates-scroll">
+                                ${dateEntriesHtml}
+                            </div>
+                            ${scrollHint}
+                        </div>
+                    `;
+
+                    const marker = L.marker([latitude, longitude])
+                        .addTo(map)
+                        .bindPopup(popupContent, { maxWidth: 320 });
+
+                    markers.push(marker);
+                });
+
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                alert("Failed to fetch data. Check console for details.");
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
