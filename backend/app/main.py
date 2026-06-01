@@ -67,6 +67,8 @@ def search_events(
             lat = venue["location"]["latitude"]
             lon = venue["location"]["longitude"]
             city_name = venue.get("city", {}).get("name", "Unknown")
+            address_info = venue.get("address") or {}
+            street_address = address_info.get("line1", "")
             
             event_date = event.get("dates", {}).get("start", {}).get("localDate")
             if not event_date:
@@ -91,6 +93,7 @@ def search_events(
             record_data = {
                 "event_name": event.get("name"),
                 "city": city_name,
+                "address": street_address,
                 "target_date": event_date,
                 "time": event.get("dates", {}).get("start", {}).get("localTime", "TBD"),
                 "latitude": lat,

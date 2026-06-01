@@ -1,140 +1,155 @@
 <!DOCTYPE html>
-<html>
+<html lang="pl">
 <head>
-    <meta charset="UTF-8"> <title>Event Map</title>
+    <meta charset="UTF-8">
+    <title>Event & Weather Explorer</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        #map { height: 100vh; width: 100vw; }
-        .control-panel {
-            position: absolute;
-            top: 20px;
-            left: 50px;
-            z-index: 1000;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 15px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-            backdrop-filter: blur(10px);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .controls-row { display: flex; align-items: center; gap: 8px; }
-        input, button { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
-        button { background: #007aff; color: white; border: none; cursor: pointer; padding: 8px 16px; }
-        button:hover { background: #0056b3; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        #loading { display: none; font-size: 14px; color: #666; font-weight: 500; }
+        /* Main setting */
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; height: 100vh; overflow: hidden; background: #f4f4f9; }
+        
+        /* Left sidebar */
+        #sidebar { width: 420px; display: flex; flex-direction: column; background: #fff; box-shadow: 2px 0 15px rgba(0,0,0,0.1); z-index: 1000; overflow-y: auto; }
+        
+        /* Right map */
+        #map-container { flex-grow: 1; position: relative; }
+        #map { width: 100%; height: 100%; }
 
-        /* Popup styles */
-        .event-popup {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            min-width: 240px;
-            max-width: 300px;
+        /* Select section */
+        .panel-section { padding: 15px 20px; border-bottom: 1px solid #eee; }
+        .controls-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .controls-row input[type="text"] { flex-grow: 1; }
+        input, button { padding: 9px; border: 1px solid #d1d5db; border-radius: 6px; outline: none; }
+        button { background: #007aff; color: white; border: none; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        button.full-width { width: 100%; padding: 12px; font-size: 15px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #9ca3af; cursor: not-allowed; }
+
+        /* Calendar section */
+        .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-weight: bold; font-size: 16px; }
+        .cal-header button { padding: 4px 10px; background: #f3f4f6; color: #333; border: 1px solid #e5e7eb; }
+        .cal-header button:hover { background: #e5e7eb; }
+        .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 12px; color: #6b7280; margin-bottom: 8px; font-weight: 600; }
+        .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        
+        .cal-day { 
+            aspect-ratio: 1; display: flex; align-items: center; justify-content: center; 
+            border-radius: 8px; cursor: pointer; position: relative; font-size: 14px; 
+            border: 2px solid transparent; transition: 0.2s;
         }
-        .event-popup-title {
-            font-weight: 700;
-            font-size: 14px;
-            margin-bottom: 10px;
-            line-height: 1.3;
-            color: #111;
+        .cal-day:hover:not(.empty) { background: #f3f4f6; }
+        .cal-day.empty { cursor: default; }
+        
+        /* Event dot */
+        .cal-day.has-event::after { 
+            content: ''; position: absolute; bottom: 6px; width: 6px; height: 6px; 
+            background: #ef4444; border-radius: 50%; 
         }
-        .event-dates-scroll {
-            max-height: 200px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            padding-right: 4px;
+        
+        /* Selected day */
+        .cal-day.selected { background: #007aff; color: #fff; font-weight: bold; }
+        .cal-day.selected.has-event::after { background: #fff; }
+
+        /* Details section */
+        #details-panel { flex-grow: 1; background: #f9fafb; padding: 20px; }
+        .empty-state { text-align: center; color: #6b7280; margin-top: 40px; font-size: 14px; }
+        
+        .weather-card { background: #e0f2fe; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #0284c7; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .weather-card h3 { margin: 0 0 8px 0; font-size: 15px; color: #0369a1; display: flex; justify-content: space-between;}
+        .weather-card p { margin: 4px 0; font-size: 14px; color: #0c4a6e; }
+
+        .event-card { 
+            background: #fff; padding: 15px; border-radius: 10px; 
+            border: 1px solid #e5e7eb; margin-bottom: 12px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
-        /* Scrollbar styling */
-        .event-dates-scroll::-webkit-scrollbar {
-            width: 5px;
+        .event-card:hover {
+            border-color: #007aff;
+            box-shadow: 0 4px 10px rgba(0,122,255,0.15);
+            transform: translateY(-2px);
         }
-        .event-dates-scroll::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 4px;
-        }
-        .event-dates-scroll::-webkit-scrollbar-thumb {
-            background: #bbb;
-            border-radius: 4px;
-        }
-        .event-dates-scroll::-webkit-scrollbar-thumb:hover {
-            background: #888;
-        }
-        .event-date-entry {
-            background: #f7f8fa;
-            border-radius: 8px;
-            padding: 8px 10px;
-            border-left: 3px solid #007aff;
-            font-size: 13px;
-            color: #333;
-            line-height: 1.6;
-        }
-        .event-date-entry a {
-            display: inline-block;
-            margin-top: 4px;
-            color: #007aff;
-            font-weight: 600;
-            text-decoration: none;
-        }
-        .event-date-entry a:hover {
-            text-decoration: underline;
-        }
-        .event-date-entry .date-label {
-            font-weight: 600;
-            color: #007aff;
-        }
-        .date-divider {
-            border: none;
-            border-top: 1px solid #e5e7eb;
-            margin: 0;
-        }
-        .scroll-hint {
-            font-size: 11px;
-            color: #999;
-            text-align: center;
-            margin-top: 5px;
-        }
+        .event-card h4 { margin: 0 0 8px 0; font-size: 15px; color: #111827; pointer-events: none; }
+        .event-card p { margin: 3px 0; font-size: 13px; color: #4b5563; pointer-events: none; }
+        .event-card a { display: inline-block; margin-top: 8px; color: #007aff; text-decoration: none; font-weight: 600; font-size: 13px; }
+        .event-card a:hover { text-decoration: underline; }
+
+        #loading { display: none; font-size: 14px; color: #007aff; text-align: center; margin-top: 10px; font-weight: bold; }
+
+        /* Map popups */
+        .event-popup { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; min-width: 240px; max-width: 300px; }
+        .event-popup-title { font-weight: 700; font-size: 14px; margin-bottom: 10px; line-height: 1.3; color: #111; }
+        .event-dates-scroll { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+        .event-dates-scroll::-webkit-scrollbar { width: 5px; }
+        .event-dates-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .event-dates-scroll::-webkit-scrollbar-thumb { background: #bbb; border-radius: 4px; }
+        .event-dates-scroll::-webkit-scrollbar-thumb:hover { background: #888; }
+        .event-date-entry { background: #f7f8fa; border-radius: 8px; padding: 8px 10px; border-left: 3px solid #007aff; font-size: 13px; color: #333; line-height: 1.6; }
+        .event-date-entry a { display: inline-block; margin-top: 4px; color: #007aff; font-weight: 600; text-decoration: none; }
+        .event-date-entry a:hover { text-decoration: underline; }
+        .event-date-entry .date-label { font-weight: 600; color: #007aff; }
+        .scroll-hint { font-size: 11px; color: #999; text-align: center; margin-top: 5px; }
     </style>
 </head>
 <body>
-    <div class="control-panel">
-        <div class="controls-row">
-            <input type="text" id="cityInput" placeholder="Enter City (e.g., Warsaw)" />
-            <input type="number" id="radiusInput" value="30" style="width: 60px;" /> km
+
+    <div id="sidebar">
+        <div class="panel-section">
+            <div class="controls-row">
+                <input type="text" id="cityInput" placeholder="Enter city" value="Warsaw" />
+                <input type="number" id="radiusInput" value="30" style="width: 70px;" title="Radius in km" /> km
+            </div>
+            <div class="controls-row">
+                <input type="date" id="startDateInput" />
+                <span style="color: #6b7280; font-size: 14px;">to</span>
+                <input type="date" id="endDateInput" />
+            </div>
+            <button id="searchBtn" class="full-width" onclick="searchArea()">Search events</button>
+            <div id="loading">Fetching events and weather...</div>
         </div>
-        <div class="controls-row">
-            <label style="font-size: 14px;">From:</label>
-            <input type="date" id="startDateInput" />
-            <label style="font-size: 14px;">To:</label>
-            <input type="date" id="endDateInput" />
-            <button id="searchBtn" onclick="searchArea()">Search</button>
+
+        <div class="panel-section" style="background: #fff;">
+            <div class="cal-header">
+                <button onclick="changeMonth(-1)">&lt;</button>
+                <span id="cal-month-year">June 2026</span>
+                <button onclick="changeMonth(1)">&gt;</button>
+            </div>
+            <div class="cal-weekdays">
+                <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+            </div>
+            <div class="cal-days" id="cal-days">
+                </div>
         </div>
-        <div id="loading">Fetching events and weather...</div>
+
+        <div id="details-panel">
+            <div class="empty-state">Search for a city and click on the day with a dot (an active event).</div>
+        </div>
     </div>
 
-    <div id="map"></div>
+    <div id="map-container">
+        <div id="map"></div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const map = L.map('map').setView([52.2297, 21.0122], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
         let markers = [];
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+        let eventsByDate = {}; 
+        let currentMonthDate = new Date();
+        let selectedDateStr = null;
 
-        // Date Constraints Logic
         const today = new Date();
         const tomorrow = new Date();
         tomorrow.setDate(today.getDate() + 1);
+
         const maxDate = new Date();
-        maxDate.setDate(tomorrow.getDate() + 13);
+        maxDate.setDate(tomorrow.getDate() + 14);
 
         const formatDate = (date) => date.toISOString().split('T')[0];
+        
         const startInput = document.getElementById('startDateInput');
         const endInput = document.getElementById('endDateInput');
 
@@ -144,12 +159,10 @@
         endInput.max = formatDate(maxDate);
 
         startInput.value = formatDate(tomorrow);
-        endInput.value = formatDate(tomorrow);
+        endInput.value = formatDate(maxDate);
 
         startInput.addEventListener('change', () => {
-            if (startInput.value > endInput.value) {
-                endInput.value = startInput.value;
-            }
+            if (startInput.value > endInput.value) endInput.value = startInput.value;
             endInput.min = startInput.value;
         });
 
@@ -165,92 +178,218 @@
 
             btn.disabled = true;
             loading.style.display = 'block';
-
-            markers.forEach(marker => map.removeLayer(marker));
-            markers = [];
+            document.getElementById('details-panel').innerHTML = '<div class="empty-state">Select a day in the calendar to lookup details.</div>';
+            
+            clearMap();
+            eventsByDate = {};
+            selectedDateStr = null;
 
             try {
                 const response = await fetch(`http://localhost:8000/api/search?city=${city}&radius=${radius}&start_date=${startDate}&end_date=${endDate}`);
                 const payload = await response.json();
 
-                map.setView([payload.center.lat, payload.center.lon], 10);
+                map.setView([payload.center.lat, payload.center.lon], 11);
 
-                // Group events by a key: event_name + lat + lon
-                // This handles the same event spanning multiple days at the same venue
-                const grouped = {};
                 payload.data.forEach(event => {
-                    const key = `${event.event_name}__${event.latitude}__${event.longitude}`;
-                    if (!grouped[key]) {
-                        grouped[key] = {
-                            event_name: event.event_name,
-                            latitude: event.latitude,
-                            longitude: event.longitude,
-                            ticket_url: event.ticket_url,
-                            dates: []
-                        };
-                    }
-                    grouped[key].dates.push(event);
+                    const date = event.target_date;
+                    if (!eventsByDate[date]) eventsByDate[date] = [];
+                    eventsByDate[date].push(event);
                 });
 
-                // Create one marker per unique event+location
-                Object.values(grouped).forEach(group => {
-                    const { event_name, latitude, longitude, dates } = group;
+                currentMonthDate = new Date(startDate);
+                renderCalendar();
 
-                    // Build date entries HTML
-                    const dateEntriesHtml = dates.map((event, i) => {
-                        const currency = event.currency || '';
-                        let priceStr = 'N/A';
-                        if (event.price_min && event.price_max && event.price_min !== event.price_max) {
-                            priceStr = `${event.price_min} – ${event.price_max} ${currency}`;
-                        } else if (event.price_min) {
-                            priceStr = `${event.price_min} ${currency}`;
-                        }
-
-                        const weatherStr = (event.weather_temp_max !== undefined && event.weather_condition)
-                            ? `${event.weather_temp_max}°C, ${event.weather_condition}`
-                            : 'N/A';
-
-                        const ticketLink = event.ticket_url
-                            ? `<a href="${event.ticket_url}" target="_blank">Tickets</a>`
-                            : '';
-
-                        return `
-                            <div class="event-date-entry">
-                                <span class="date-label"> ${event.target_date}</span> at ${event.time || 'TBD'}<br>
-                                Price: ${priceStr}<br>
-                                Weather: ${weatherStr}
-                                ${ticketLink}
-                            </div>
-                        `;
-                    }).join('');
-
-                    const scrollHint = dates.length > 3
-                        ? `<div class="scroll-hint">scroll for all ${dates.length} dates</div>`
-                        : '';
-
-                    const popupContent = `
-                        <div class="event-popup">
-                            <div class="event-popup-title">${event_name}</div>
-                            <div class="event-dates-scroll">
-                                ${dateEntriesHtml}
-                            </div>
-                            ${scrollHint}
-                        </div>
-                    `;
-
-                    const marker = L.marker([latitude, longitude])
-                        .addTo(map)
-                        .bindPopup(popupContent, { maxWidth: 320 });
-
-                    markers.push(marker);
-                });
+                drawMarkersForEvents(payload.data);
 
             } catch (error) {
-                console.error("Error fetching data:", error);
-                alert("Failed to fetch data. Check console for details.");
+                console.error("Error:", error);
+                alert("Error in data fetching");
             } finally {
                 btn.disabled = false;
                 loading.style.display = 'none';
+            }
+        }
+
+        function changeMonth(offset) {
+            currentMonthDate.setMonth(currentMonthDate.getMonth() + offset);
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const year = currentMonthDate.getFullYear();
+            const month = currentMonthDate.getMonth();
+            
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            document.getElementById('cal-month-year').innerText = `${monthNames[month]} ${year}`;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            let startOffset = firstDay === 0 ? 6 : firstDay - 1;
+
+            const daysContainer = document.getElementById('cal-days');
+            let html = '';
+
+            for(let i=0; i<startOffset; i++) {
+                html += `<div class="cal-day empty"></div>`;
+            }
+
+            for(let i=1; i<=daysInMonth; i++) {
+                let d = new Date(year, month, i);
+                d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                let dateStr = d.toISOString().split('T')[0];
+                
+                let hasEventClass = eventsByDate[dateStr] ? 'has-event' : '';
+                let selectedClass = (dateStr === selectedDateStr) ? 'selected' : '';
+                
+                html += `<div class="cal-day ${hasEventClass} ${selectedClass}" onclick="selectDate('${dateStr}')">${i}</div>`;
+            }
+            daysContainer.innerHTML = html;
+        }
+
+        function selectDate(dateStr) {
+            selectedDateStr = dateStr;
+            renderCalendar();
+            
+            const detailsPanel = document.getElementById('details-panel');
+            const events = eventsByDate[dateStr] || [];
+
+            if (events.length === 0) {
+                detailsPanel.innerHTML = `
+                    <div class="empty-state">
+                        <strong>No events</strong><br>
+                        No events found for ${dateStr} in selected region.
+                    </div>`;
+                clearMap();
+                return;
+            }
+
+            const weather = events[0];
+            let weatherHtml = `
+                <div class="weather-card">
+                    <h3><span>Weather forecast for ${dateStr}</span> <span>${weather.weather_temp_max || '--'}°C</span></h3>
+                    <p><strong>Condition:</strong> ${weather.weather_condition || 'Unknown'}</p>
+                    <p><strong>Rain probability:</strong> ${weather.weather_precip_prob_pct || 0}%</p>
+                    <p><strong>Wind:</strong> up to ${weather.weather_wind_speed_kmh || 0} km/h</p>
+                </div>
+                <h3 style="font-size: 15px; margin-bottom: 10px; color: #333;">Events (${events.length}):</h3>
+            `;
+
+            let eventsHtml = events.map(ev => {
+                const price = ev.price_min ? `from ${ev.price_min} ${ev.currency}` : 'Price range unknown';
+                const ticket = ev.ticket_url ? `<a href="${ev.ticket_url}" target="_blank" onclick="event.stopPropagation()">Buy ticket &rarr;</a>` : '';
+                const locationText = ev.address ? `${ev.city}, ${ev.address}` : ev.city;
+
+                return `
+                    <div class="event-card" onclick="highlightMarker(${ev.latitude}, ${ev.longitude})" title="Click to view on map">
+                        <h4>${ev.event_name}</h4>
+                        <p>${locationText} • ${ev.time || 'Unknown'}</p>
+                        <p>${price}</p>
+                        ${ticket}
+                    </div>
+                `;
+            }).join('');
+
+            detailsPanel.innerHTML = weatherHtml + eventsHtml;
+
+            drawMarkersForEvents(events);
+        }
+
+        function highlightMarker(lat, lng) {
+            const targetMarker = markers.find(m => {
+                const pos = m.getLatLng();
+                return pos.lat == lat && pos.lng == lng; 
+            });
+
+            if (targetMarker) {
+                map.flyTo([lat, lng], 15, { animate: true, duration: 1.5 });
+                
+                targetMarker.openPopup();
+            }
+        }
+
+        function clearMap() {
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+        }
+
+        function drawMarkersForEvents(eventsList) {
+            clearMap();
+            
+            const grouped = {};
+            eventsList.forEach(event => {
+                const key = `${event.event_name}__${event.latitude}__${event.longitude}`;
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        event_name: event.event_name,
+                        latitude: event.latitude,
+                        longitude: event.longitude,
+                        ticket_url: event.ticket_url,
+                        city: event.city,
+                        address: event.address,
+                        dates: []
+                    };
+                }
+                grouped[key].dates.push(event);
+            });
+
+            Object.values(grouped).forEach(group => {
+                const { event_name, latitude, longitude, dates, city, address } = group;
+                const locationText = address ? `${city}, ${address}` : city;
+
+                const dateEntriesHtml = dates.map(event => {
+                    const currency = event.currency || '';
+                    let priceStr = 'Unknown';
+                    if (event.price_min && event.price_max && event.price_min !== event.price_max) {
+                        priceStr = `${event.price_min} – ${event.price_max} ${currency}`;
+                    } else if (event.price_min) {
+                        priceStr = `${event.price_min} ${currency}`;
+                    }
+
+                    const weatherStr = (event.weather_temp_max !== undefined && event.weather_condition)
+                        ? `${event.weather_temp_max}°C, ${event.weather_condition}`
+                        : 'No data';
+
+                    const ticketLink = event.ticket_url
+                        ? `<a href="${event.ticket_url}" target="_blank">Buy ticket &rarr;</a>`
+                        : '';
+
+                    return `
+                        <div class="event-date-entry">
+                            <span class="date-label">${event.target_date}</span> at ${event.time || 'TBD'}<br>
+                            Price: ${priceStr}<br>
+                            Weather: ${weatherStr}
+                            <br>${ticketLink}
+                        </div>
+                    `;
+                }).join('');
+
+                const scrollHint = dates.length > 3
+                    ? `<div class="scroll-hint">Scroll to see more</div>`
+                    : '';
+
+                const popupContent = `
+                    <div class="event-popup">
+                        <div class="event-popup-title">${event_name}</div>
+                        <div style="font-size: 13px; color: #555; margin-bottom: 10px; font-weight: 500;">
+                            ${locationText}
+                        </div>
+                        <div class="event-dates-scroll">
+                            ${dateEntriesHtml}
+                        </div>
+                        ${scrollHint}
+                    </div>
+                `;
+
+                const marker = L.marker([latitude, longitude])
+                    .addTo(map)
+                    .bindPopup(popupContent, { maxWidth: 320 });
+                markers.push(marker);
+            });
+
+            if (markers.length > 0) {
+                const group = new L.featureGroup(markers);
+                map.fitBounds(group.getBounds(), { padding: [50, 50], maxZoom: 13 });
             }
         }
     </script>

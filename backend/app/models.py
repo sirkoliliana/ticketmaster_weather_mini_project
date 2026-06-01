@@ -7,6 +7,7 @@ class EventWeatherRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     event_name = Column(String, index=True)
     city = Column(String, index=True)
+    address = Column(String, nullable=True)
     target_date = Column(Date)
     time = Column(String)
     latitude = Column(String)
