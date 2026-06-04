@@ -11,8 +11,12 @@ services:
   test_backend:
     build:
       context: ./backend
-      target: test
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=postgresql://user:password@test_db:5432/event_weather_test
     depends_on:
       - test_db
+    ports:
+      - "8001:8000"
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
