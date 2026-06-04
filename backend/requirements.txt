@@ -3,6 +3,7 @@ uvicorn[standard]
 python-dotenv
 requests
 pytest
+pytest-mock
 httpx
 sqlalchemy
 psycopg2-binary

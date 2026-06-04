@@ -5,6 +5,7 @@ from datetime import date
 from app.ingestion import geocode_city, fetch_events, fetch_weather
 from app.database import engine, get_db, Base
 from app.models import EventWeatherRecord
+from datetime import date, datetime, timedelta, timezone
 
 Base.metadata.create_all(bind=engine)
 
@@ -41,7 +42,15 @@ def search_events(
     except Exception:
         raise HTTPException(status_code=502, detail="External API error")
 
-    # Fetch existing cache
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
+    db.query(EventWeatherRecord).filter(
+        EventWeatherRecord.city.ilike(f"%{city}%"),
+        EventWeatherRecord.target_date >= start_date,
+        EventWeatherRecord.target_date <= end_date,
+        EventWeatherRecord.fetched_at < cutoff_time
+    ).delete(synchronize_session=False)
+    db.commit()
+
     cached_records = db.query(EventWeatherRecord).filter(
         EventWeatherRecord.city.ilike(f"%{city}%"),
         EventWeatherRecord.target_date >= start_date,
@@ -51,7 +60,6 @@ def search_events(
     if cached_records:
         return {"center": {"lat": center_lat, "lon": center_lon}, "data": cached_records}
 
-    # Fetch from APIs
     try:
         events = fetch_events(center_lat, center_lon, radius, start_date, end_date)
     except Exception:
@@ -74,7 +82,6 @@ def search_events(
             if not event_date:
                 continue
 
-            # Deduplication check
             existing = db.query(EventWeatherRecord).filter_by(
                 event_name=event.get("name"),
                 target_date=event_date,
@@ -120,4 +127,6 @@ def search_events(
             continue
 
     db.commit()
+    for record in results:
+        db.refresh(record)
     return {"center": {"lat": center_lat, "lon": center_lon}, "data": results}
