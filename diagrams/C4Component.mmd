@@ -1,0 +1,22 @@
+C4Component
+    title System Component Diagram
+ 
+    Container_Ext(frontend, "Frontend Web Page", "JavaScript", "Sends requests for event data.")
+    ContainerDb(db, "PostgreSQL Database", "SQL", "Stores normalized event and weather records.")
+    System_Ext(ticketmaster, "Ticketmaster API", "External System")
+    System_Ext(openweather, "OpenMeteo API", "External System")
+ 
+    Container_Boundary(backend, "Python Backend Application") {
+        Component(api_router, "API Controller", "FastAPI", "Exposes REST endpoints to the frontend.")
+        Component(db_access, "Database Repository", "SQL", "Handles all read/write operations to PostgreSQL.")
+        Component(ingestion_mod, "Data Ingestion Module", "Python Requests", "Handles API keys, rate limits, and fetching raw data from external sources.")
+        Component(processing_mod, "Data Processing Module", "Python", "Parses JSON, cleans data, and merges event coordinates with weather forecasts.")
+    }
+ 
+    Rel(frontend, api_router, "Make REST API calls", "JSON/HTTPS")
+    Rel(api_router, db_access, "Requests formatted data")
+    Rel(db_access, db, "Executes SQL queries")
+    Rel(ingestion_mod, ticketmaster, "Fetches events", "HTTPS")
+    Rel(ingestion_mod, openweather, "Fetches weather", "HTTPS")
+    Rel(ingestion_mod, processing_mod, "Passes raw JSON payloads")
+    Rel(processing_mod, db_access, "Saves normalized, merged data")

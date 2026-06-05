@@ -1,0 +1,22 @@
+C4Container
+    title System Container Diagram
+ 
+    Person(user, "User", "Interacts with the web page")
+ 
+    System_Ext(ticketmaster, "Ticketmaster API", "Open Data Source 1")
+    System_Ext(openweather, "OpenMeteo API", "Open Data Source 2")
+ 
+    System_Boundary(sys, "Event-Weather System (Dockerized)") {
+        Container(frontend, "Frontend Web Page", "JavaScript", "Displays event and weather info")
+        Container(api, "Backend API", "Python", "Serves merged JSON data via REST")
+        Container(ingestion, "Ingestion & Processing Service", "Python", "Fetches, normalizes, and merges external data")
+        ContainerDb(db, "Database", "PostgreSQL", "Stores processed events and weather forecasts")
+    }
+ 
+    Rel(user, frontend, "Interacts with UI", "HTTPS")
+    Rel(frontend, api, "Requests event/weather data", "JSON/REST")
+    Rel(api, db, "Queries data", "SQL")
+    Rel(ingestion, db, "Writes normalized data", "SQL")
+    Rel(ingestion, ticketmaster, "Fetches event locations/times", "HTTPS")
+    Rel(ingestion, openweather, "Fetches spatial weather data", "HTTPS")
+  
