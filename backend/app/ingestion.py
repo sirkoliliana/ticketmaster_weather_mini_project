@@ -1,15 +1,21 @@
 import os
 import requests
 from typing import List, Dict, Any
+import logging
+
+logger = logging.getLogger("IngestionService")
 
 TICKETMASTER_KEY = os.getenv("TICKETMASTER_API_KEY")
 
 def geocode_city(city: str) -> tuple[str, str]:
+    logger.info(f"Fetching city location: city={city}")
+
     url = "https://geocoding-api.open-meteo.com/v1/search"
     response = requests.get(url, params={"name": city, "count": 1})
     response.raise_for_status()
     results = response.json().get("results")
     if not results:
+        logger.warning(f"City '{city}' not found")
         raise ValueError("City not found")
     return str(results[0]["latitude"]), str(results[0]["longitude"])
 
@@ -17,6 +23,9 @@ def geocode_city(city: str) -> tuple[str, str]:
 def fetch_events(lat: str, lon: str, radius: int, start_date: str, end_date: str) -> List[Dict[str, Any]]:
     start_dt = f"{start_date}T00:00:00Z"
     end_dt = f"{end_date}T23:59:59Z"
+
+    logger.info(f"Fetching event from Ticketmaster: lat={lat}, lon={lon}, radius={radius}km")
+
     url = "https://app.ticketmaster.com/discovery/v2/events.json"
     params = {
         "latlong": f"{lat},{lon}",
@@ -33,6 +42,8 @@ def fetch_events(lat: str, lon: str, radius: int, start_date: str, end_date: str
     return response.json().get("_embedded", {}).get("events", [])
 
 def fetch_weather(lat: str, lon: str, target_date: str) -> Dict[str, Any]:
+    logger.info(f"Fetching weather info from OpenMeteo: lat={lat}, lon={lon}, date={target_date}")
+    
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": lat,

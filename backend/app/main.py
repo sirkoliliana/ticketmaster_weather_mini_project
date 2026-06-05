@@ -6,6 +6,14 @@ from app.ingestion import geocode_city, fetch_events, fetch_weather
 from app.database import engine, get_db, Base
 from app.models import EventWeatherRecord
 from datetime import date, datetime, timedelta, timezone
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+)
+logger = logging.getLogger("EventWeatherAPI")
+logger.info("Starting the FastAPI sever...")
 
 Base.metadata.create_all(bind=engine)
 
@@ -35,11 +43,15 @@ def search_events(
     end_date: str = Query(default_factory=lambda: date.today().isoformat()),
     db: Session = Depends(get_db)
 ):
+    logger.info(f"Received query: city={city}, radius={radius}, period={start_date} to {end_date}")
+
     try:
         center_lat, center_lon = geocode_city(city)
     except ValueError:
+        logger.warning(f"City not found: {city}")
         raise HTTPException(status_code=404, detail="City not found")
-    except Exception:
+    except Exception as e:
+        logger.error(f"Geocoding error for {city}: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail="External API error")
 
     cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
@@ -62,7 +74,8 @@ def search_events(
 
     try:
         events = fetch_events(center_lat, center_lon, radius, start_date, end_date)
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error in fetching data from Ticketmastera: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail="External API error")
 
     if not events:
@@ -123,7 +136,8 @@ def search_events(
             db.add(db_record)
             results.append(db_record)
             
-        except (KeyError, IndexError):
+        except Exception as e:
+            logger.error(f"Error in parsing the event '{event.get('name', 'Unknown')}': {e}")
             continue
 
     db.commit()

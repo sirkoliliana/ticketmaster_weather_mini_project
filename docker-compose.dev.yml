@@ -3,7 +3,6 @@ version: '3.8'
 services:
   db:
     image: postgres:15-alpine
-    # Automatically pulls ARM64 for Mac or AMD64 for Windows
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
@@ -12,6 +11,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d event_weather_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
@@ -26,7 +30,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://user:password@db:5432/event_weather_dev
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   frontend:
     image: nginx:alpine
