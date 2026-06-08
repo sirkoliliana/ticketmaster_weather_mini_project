@@ -4,18 +4,25 @@ services:
   test_db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: event_weather_test
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=event_weather_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d event_weather_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
 
   test_backend:
     build:
       context: ./backend
-      target: test
     env_file:
-      - .env
+      - ./.env
     environment:
       - DATABASE_URL=postgresql://user:password@test_db:5432/event_weather_test
-      - PYTHONPATH=/app
     depends_on:
-      - test_db
+      test_db:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000

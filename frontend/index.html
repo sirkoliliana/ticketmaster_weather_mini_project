@@ -153,12 +153,12 @@
         const startInput = document.getElementById('startDateInput');
         const endInput = document.getElementById('endDateInput');
 
-        startInput.min = formatDate(tomorrow);
+        startInput.min = formatDate(today);
         startInput.max = formatDate(maxDate);
-        endInput.min = formatDate(tomorrow);
+        endInput.min = formatDate(today);
         endInput.max = formatDate(maxDate);
 
-        startInput.value = formatDate(tomorrow);
+        startInput.value = formatDate(today);
         endInput.value = formatDate(maxDate);
 
         startInput.addEventListener('change', () => {
