@@ -20,7 +20,7 @@ The full project documentation, along with the architectural justification, can 
 
 Before running the application, ensure that there is a `.env` file in the root directory containing the appropriate API access keys (a template is available in the `.env.example` file).
 
-The system supports three fully isolated containerized environments: development (`dev`), testing (`test`), and production (`prod`). In the commands below replace `{dev/test/prod}` with the chosen environment, e.g., `docker-compose.dev.yml`.
+The system supports three fully isolated containerized environments: development (`dev`), testing (`test`), and production (`prod`). In the commands below replace `{dev/test/prod}` with the chosen environment, e.g., `docker-compose.dev.yml`. The page is available under localhost:8080 for development and localhost:80 for production.
 
 **Starting a selected environment:**
 
